@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+/* ============================================================
+   DESIGN-SYSTEM
+   Hier stehen alle Farben und Schriften der App an EINER Stelle.
+   Wenn du z.B. das Orange aendern willst, aenderst du es nur hier
+   und die ganze App zieht automatisch nach.
+   ============================================================ */
+@theme {
+  /* Hintergruende: echtes Schwarz spart auf OLED-Displays Akku */
+  --color-ink: #000000;        /* Grundflaeche der App        */
+  --color-surface: #0e0e0e;    /* Karten / Felder             */
+  --color-surface-2: #171717;  /* Karten beim Antippen        */
+  --color-line: #242424;       /* dezente Trennlinien         */
+
+  /* Akzentfarbe Orange - warm, nicht grell */
+  --color-accent: #ff7a1a;
+  --color-accent-dim: #b4550f;
+
+  /* Schrift */
+  --color-text: #f5f5f4;       /* normale Schrift             */
+  --color-muted: #8a8a85;      /* Nebensaechliches, Datum     */
+
+  /* Rueckmeldung */
+  --color-done: #4ade80;       /* gruenes Haekchen            */
+}
+
+/* Grundverhalten der Seite */
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-ink);
+  color: var(--color-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* verhindert das "Gummiband"-Ueberscrollen auf dem Handy */
+  overscroll-behavior: none;
+}
+
+/* Scrollbalken dezent halten (Desktop) */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: var(--color-line); border-radius: 3px; }
+
+/* Nichts soll sich beim Tippen blau markieren (fuehlt sich sonst
+   nicht nach App an, sondern nach Webseite) */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- Bewegungen ----------
+   Bewusst weich und kurz - harte Spruenge wirken unruhig. */
+@keyframes sheet-hoch {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes einblenden {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes haken-pop {
+  0%   { transform: scale(0.4); opacity: 0; }
+  60%  { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-sheet { animation: sheet-hoch 280ms cubic-bezier(0.32, 0.72, 0, 1); }
+.animate-fade  { animation: einblenden 200ms ease-out; }
+.animate-haken { animation: haken-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* Wer im System "Bewegung reduzieren" eingestellt hat, bekommt keine */
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet, .animate-fade, .animate-haken { animation: none; }
+}

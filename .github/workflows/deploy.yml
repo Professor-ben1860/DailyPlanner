@@ -1,0 +1,70 @@
+# ============================================================
+# AUTOMATISCHE VEROEFFENTLICHUNG AUF GITHUB PAGES
+# ------------------------------------------------------------
+# Diese Datei sagt GitHub: "Immer wenn neuer Code ankommt, baue
+# die App und stelle sie ins Netz." Das laeuft auf GitHubs eigenen
+# Rechnern und ist fuer oeffentliche Projekte kostenlos.
+# ============================================================
+
+name: App veroeffentlichen
+
+on:
+  # Bei jeder Aenderung am Hauptzweig
+  push:
+    branches: [main]
+  # ... und wenn du es auf GitHub von Hand ausloest
+  workflow_dispatch:
+
+# Berechtigungen, die GitHub Pages zum Veroeffentlichen braucht
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Laeuft immer nur eine Veroeffentlichung gleichzeitig
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code holen
+        uses: actions/checkout@v4
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pakete installieren
+        run: npm ci
+
+      - name: App bauen
+        run: npm run build
+        env:
+          # Der Ordnername auf GitHub Pages entspricht dem
+          # Namen des Repositorys - hier wird er automatisch
+          # eingesetzt, egal wie du es genannt hast.
+          BASE_PATH: /${{ github.event.repository.name }}/
+
+      - name: Pages vorbereiten
+        uses: actions/configure-pages@v5
+
+      - name: Ergebnis hochladen
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  veroeffentlichen:
+    needs: bauen
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Auf GitHub Pages stellen
+        id: deployment
+        uses: actions/deploy-pages@v4
