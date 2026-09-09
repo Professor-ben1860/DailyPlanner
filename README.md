@@ -1,4 +1,5 @@
-# Daily Planner
+| `npm run icons` | Zeichnet die App-Symbole neu (nach Farbaenderung) |
+| `npm run android` | Baut die Android-App und legt DailyPlanner.apk auf den Desktop |# Daily Planner
 
 Kalender, Aufgaben, Projekte, Gewohnheiten und Notizen an einem Ort.
 Laeuft als Web-App im Browser (PWA) und spaeter als echte Android-App
