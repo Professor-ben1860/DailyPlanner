@@ -13,7 +13,7 @@
    ============================================================ */
 
 import { deflateSync } from 'node:zlib'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -85,14 +85,19 @@ function alsPng(breite, hoehe, punkte) {
    Teil 2: Das Symbol zeichnen
    ============================================================ */
 
-/** Mischt eine Farbe mit der vorhandenen - fuer weiche Kanten */
+/** Mischt eine Farbe ueber die vorhandene - fuer weiche Kanten */
 function malen(punkte, index, farbe, deckung) {
   if (deckung <= 0) return
   const d = Math.min(1, deckung)
+  const altA = punkte[index + 3] / 255
+  const neuA = d + altA * (1 - d)
+  if (neuA <= 0) return
+
   for (let k = 0; k < 3; k++) {
-    punkte[index + k] = Math.round(punkte[index + k] * (1 - d) + farbe[k] * d)
+    const alt = punkte[index + k] * altA * (1 - d)
+    punkte[index + k] = Math.round((farbe[k] * d + alt) / neuA)
   }
-  punkte[index + 3] = 255
+  punkte[index + 3] = Math.round(neuA * 255)
 }
 
 /** Abstand eines Punktes zu einer Strecke - fuer das Haekchen */
@@ -107,30 +112,39 @@ function abstandZurStrecke(px, py, x1, y1, x2, y2) {
   return Math.hypot(px - nx, py - ny)
 }
 
-function zeichneSymbol(groesse) {
+/**
+ * Zeichnet das Symbol.
+ * @param groesse       Kantenlaenge in Bildpunkten
+ * @param mitHintergrund false = durchsichtiger Hintergrund (fuer Androids
+ *                       "adaptive icons", bei denen das System den Grund malt)
+ * @param radiusAnteil   Groesse des Kreises im Verhaeltnis zum Bild
+ */
+function zeichneSymbol(groesse, mitHintergrund = true, radiusAnteil = 0.34) {
   const punkte = Buffer.alloc(groesse * groesse * 4)
 
-  // Hintergrund vollflaechig fuellen
-  for (let i = 0; i < groesse * groesse; i++) {
-    punkte[i * 4] = GRUND[0]
-    punkte[i * 4 + 1] = GRUND[1]
-    punkte[i * 4 + 2] = GRUND[2]
-    punkte[i * 4 + 3] = 255
+  if (mitHintergrund) {
+    for (let i = 0; i < groesse * groesse; i++) {
+      punkte[i * 4] = GRUND[0]
+      punkte[i * 4 + 1] = GRUND[1]
+      punkte[i * 4 + 2] = GRUND[2]
+      punkte[i * 4 + 3] = 255
+    }
   }
 
   const mitte = groesse / 2
   // Radius bewusst klein: Android schneidet Symbole rund oder eckig zu,
   // der Rand muss also frei bleiben ("Sicherheitsbereich").
-  const radius = groesse * 0.34
+  const radius = groesse * radiusAnteil
 
-  // Eckpunkte des Haekchens
-  const h1x = mitte - groesse * 0.135
-  const h1y = mitte + groesse * 0.005
-  const h2x = mitte - groesse * 0.035
-  const h2y = mitte + groesse * 0.105
-  const h3x = mitte + groesse * 0.15
-  const h3y = mitte - groesse * 0.105
-  const dicke = groesse * 0.055
+  // Eckpunkte des Haekchens - im Verhaeltnis zum Kreis, damit es
+  // bei jeder Kreisgroesse gleich aussieht
+  const h1x = mitte - radius * 0.397
+  const h1y = mitte + radius * 0.015
+  const h2x = mitte - radius * 0.103
+  const h2y = mitte + radius * 0.309
+  const h3x = mitte + radius * 0.441
+  const h3y = mitte - radius * 0.309
+  const dicke = radius * 0.162
 
   for (let y = 0; y < groesse; y++) {
     for (let x = 0; x < groesse; x++) {
@@ -190,3 +204,65 @@ writeFileSync(
 `,
 )
 console.log('geschrieben: favicon.svg')
+
+/* ============================================================
+   Teil 4: Symbole fuer die Android-App
+   ------------------------------------------------------------
+   Android braucht das Symbol in fuenf Aufloesungen. Zusaetzlich
+   gibt es das "adaptive icon": Dabei liefert die App nur das
+   Motiv (Vordergrund) und das Betriebssystem malt den Hintergrund
+   und schneidet die Form zu - rund, eckig oder tropfenfoermig,
+   je nach Handy. Das Motiv muss deshalb kleiner sein.
+   ============================================================ */
+
+const ANDROID = join(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  'android',
+  'app',
+  'src',
+  'main',
+  'res',
+)
+
+// Ordnername -> [Symbolgroesse, Groesse des Vordergrundbildes]
+const DICHTEN = {
+  'mipmap-mdpi': [48, 108],
+  'mipmap-hdpi': [72, 162],
+  'mipmap-xhdpi': [96, 216],
+  'mipmap-xxhdpi': [144, 324],
+  'mipmap-xxxhdpi': [192, 432],
+}
+
+if (existsSync(ANDROID)) {
+  for (const [ordner, [klein, gross]] of Object.entries(DICHTEN)) {
+    const ziel = join(ANDROID, ordner)
+    mkdirSync(ziel, { recursive: true })
+
+    const symbol = zeichneSymbol(klein)
+    writeFileSync(join(ziel, 'ic_launcher.png'), symbol)
+    writeFileSync(join(ziel, 'ic_launcher_round.png'), symbol)
+
+    // Vordergrund: durchsichtig und kleineres Motiv, damit beim
+    // Zuschneiden nichts vom Haekchen verloren geht
+    writeFileSync(
+      join(ziel, 'ic_launcher_foreground.png'),
+      zeichneSymbol(gross, false, 0.227),
+    )
+  }
+
+  // Den Hintergrund des adaptiven Symbols auf Schwarz stellen
+  mkdirSync(join(ANDROID, 'values'), { recursive: true })
+  writeFileSync(
+    join(ANDROID, 'values', 'ic_launcher_background.xml'),
+    `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">${grundHex}</color>
+</resources>
+`,
+  )
+
+  console.log('geschrieben: Android-Symbole in 5 Aufloesungen')
+} else {
+  console.log('uebersprungen: Android-Ordner noch nicht vorhanden')
+}

@@ -75,13 +75,35 @@ type DatenContext = {
 const Context = createContext<DatenContext | null>(null)
 
 export function DatenProvider({ children }: { children: ReactNode }) {
+  const [daten, setDaten] = useState<AppDaten>(LEERE_DATEN)
+
+  /* Der Speicher antwortet auf dem Handy nicht sofort. Deshalb starten
+     wir leer und merken uns, ob die echten Daten schon da sind. */
+  const [geladen, setGeladen] = useState(false)
+
   // Beim Start einmal aus dem Speicher lesen
-  const [daten, setDaten] = useState<AppDaten>(datenLaden)
+  useEffect(() => {
+    let abgebrochen = false
+
+    datenLaden().then((gelesen) => {
+      if (abgebrochen) return
+      setDaten(gelesen)
+      setGeladen(true)
+    })
+
+    // Falls die App vorher geschlossen wird: Ergebnis verwerfen
+    return () => {
+      abgebrochen = true
+    }
+  }, [])
 
   // Nach jeder Aenderung automatisch zurueckschreiben
   useEffect(() => {
+    // WICHTIG: Solange nicht geladen ist, wuerden wir die noch leeren
+    // Startdaten ueber die echten schreiben und alles loeschen.
+    if (!geladen) return
     datenSpeichern(daten)
-  }, [daten])
+  }, [daten, geladen])
 
   /* ---------------- Aufgaben ---------------- */
 
@@ -357,6 +379,16 @@ export function DatenProvider({ children }: { children: ReactNode }) {
       allesZuruecksetzen,
     ],
   )
+
+  /* Bis die Daten da sind, ein ruhiger schwarzer Bildschirm mit
+     pulsierendem Punkt - meist nur den Bruchteil einer Sekunde. */
+  if (!geladen) {
+    return (
+      <div className="flex h-full items-center justify-center bg-ink">
+        <span className="h-3 w-3 animate-pulse rounded-full bg-accent" />
+      </div>
+    )
+  }
 
   return <Context.Provider value={wert}>{children}</Context.Provider>
 }
